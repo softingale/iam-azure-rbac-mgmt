@@ -1,0 +1,20 @@
+# name: Validate Files
+
+# on:
+#   workflow_dispatch:
+#     inputs:
+#       branch:
+#         description: 'Sample run'
+#         required: true
+#         default: 'main'
+
+# jobs:
+#   validate-files:
+#     runs-on: "[linux]"
+#     steps:
+#       = name: Checkout repo
+#         uses: actions/checkout@v4
+      
+#       - name: Validate Sepcfiles
+#         run: |
+#           python .github/workflows/validate-files.py -d

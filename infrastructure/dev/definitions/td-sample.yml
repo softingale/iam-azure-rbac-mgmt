@@ -1,0 +1,11 @@
+properties:
+  roleName: TD-SubReader
+  description: View all resources, but does not allow you to make any changes.
+  assignableScopes:
+    - /
+  permissions:
+    - actions:
+        - "*/read"
+      notAction: []
+      dataAction: []
+      notDataAction: []

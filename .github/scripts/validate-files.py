@@ -247,7 +247,7 @@ def main():
         die(f"Error: {Red}{files_list_path}:{Rst} is not a valid file.")
 
     # Validate repository folder structure
-    validate_repo_structure(".", repo_structure_schema)
+    validate_repo_structure("infrastructure/", repo_structure_schema)
 
     # with open(files_list_path, "r") as files_list:
     #     files_paths = files_list.read().strip().split('\n')

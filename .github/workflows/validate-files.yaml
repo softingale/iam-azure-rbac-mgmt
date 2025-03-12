@@ -15,4 +15,4 @@ jobs:
       - uses: actions/checkout@v4
       
       - run: |
-          python .github/workflows/validate-files.py -d
+          python .github/scripts/validate-files.py -d

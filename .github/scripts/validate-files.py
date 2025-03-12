@@ -262,3 +262,6 @@ def main():
         os.remove(status_file_path)
         os.remove(files_list_path)
         os.rmdir(temp_dir)
+
+if __name__ == "__main__":
+    main()

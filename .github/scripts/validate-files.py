@@ -27,35 +27,68 @@ service_list = [name for name in os.listdir(p) if (
 service_list = service_list + ["gcpsa", "appsp"]
 
 # === GLOBAL SCHEMA DEFINITIONS ===
-rbac_definition_schema = Schema({
+
+base_role_schema = {
     "roleName": And(str, Regex(r'^[a-zA-Z][a-zA-Z0-9\- _]*$')),
     "description": str,
     "assignableScopes": [str],
     "permissions": [
         {
             "actions": [str],
-            "notActions": [str],
-            "dataActions": [str],
-            "notDataActions": [str]
+            # Allow either plural or singular naming; these keys are optional
+            Optional("notActions"): [str],
+            Optional("notAction"): [str],
+            Optional("dataActions"): [str],
+            Optional("dataAction"): [str],
+            Optional("notDataActions"): [str],
+            Optional("notDataAction"): [str]
         }
     ]
-})
+}
 
-role_definition_schems = Schema({
-    "properties": {
-        "roleName": And(str, Regex(r'^[a-zA-Z][a-zA-Z0-9\- _]*$')),
-        "description": str,
-        "assignableScopes": [str],
-        "permissions": [
-            {
-                "actions": [str],
-                "notActions": [str],
-                "dataActions": [str],
-                "notDataActions": [str]
-            }
-        ]
-    }
-})
+# Combined RBAC definition schema:
+# It accepts either a flat structure or one wrapped in a "properties" key.
+
+rbac_definition_schema = Or(
+    Schema(base_role_schema, ignore_extra_keys=False),
+    Schema({"properties": base_role_schema}, ignore_extra_keys=False)
+)
+
+
+# rbac_definition_schema = Or(
+#     Schema(base_role_schema),
+#     Schema({"properties": base_role_schema})
+# )
+
+# rbac_definition_schema = Schema({
+#         "roleName": And(str, Regex(r'^[a-zA-Z][a-zA-Z0-9\- _]*$')),
+#         "description": str,
+#         "assignableScopes": [str],
+#         "permissions": [
+#             {
+#                 "actions": [str],
+#                 "notActions": [str],
+#                 "dataActions": [str],
+#                 "notDataActions": [str]
+#             }
+#         ]
+# })
+
+# role_definition_schema = Schema({
+#     "properties": {
+#         "roleName": And(str, Regex(r'^[a-zA-Z][a-zA-Z0-9\- _]*$')),
+#         "description": str,
+#         "assignableScopes": [str],
+#         "permissions": [
+#             {
+#                 "actions": [str],
+#                 "notActions": [str],
+#                 "dataActions": [str],
+#                 "notDataActions": [str]
+#             }
+#         ]
+#     }
+# })
 repo_structure_schema = Schema({
     "dev": {
         "assignments": Or([], None),
@@ -86,6 +119,17 @@ def write_error_status(status_file_path):
     """Writes 'error' to the specified validation status file."""
     with open(status_file_path, "w") as status_file:
         status_file.write("error")
+
+
+def check_required_keys(data):
+    # Define the required keys for a flat structure.
+    required = ["roleName", "description", "assignableScopes", "permissions"]
+    if "properties" in data:
+        # If wrapped, check inside the properties.
+        data = data["properties"]
+    for key in required:
+        if key not in data:
+            raise SchemaError(f"Missing required key: {key}")
 
 
 def validate_filename(filename):
@@ -151,24 +195,24 @@ def validate_repo_structure(base_dir, repo_schema):
         print(f"{Rst}Error: Repository forlder structure validation failed:\n{e}{Rst}")
 
 
-def validate_rbac_definition(data, rbac_schema):
-    global ENCOUNTERED_ERROR, status_file_path
-    try:
-        rbac_schema.validate(data)
-        print(f"{Grn}PASS{Rst}: RBAC definition is valid.")
-    except SchemaError as e:
-        if not ENCOUNTERED_ERROR:
-            print(f"{Red}FAILURE{Rst}")
+# def validate_rbac_definition(data, rbac_schema):
+#     global ENCOUNTERED_ERROR, status_file_path
+#     try:
+#         rbac_schema.validate(data)
+#         print(f"{Grn}PASS{Rst}: RBAC definition is valid.")
+#     except SchemaError as e:
+#         if not ENCOUNTERED_ERROR:
+#             print(f"{Red}FAILURE{Rst}")
 
 
-def validate_rbac_definition(data, rbac_schema):
-    global ENCOUNTERED_ERROR, status_file_dir
-    try:
-        rbac_schema.validate(data)
-        print(f"{Grn}PASS{Rst}: RBAC definition is valid.")
-    except SchemaError as e:
-        if not ENCOUNTERED_ERROR:
-            print(f"{Red}FAILURE{Rst}")
+# def validate_rbac_definition(data, rbac_schema):
+#     global ENCOUNTERED_ERROR, status_file_dir
+#     try:
+#         rbac_schema.validate(data)
+#         print(f"{Grn}PASS{Rst}: RBAC definition is valid.")
+#     except SchemaError as e:
+#         if not ENCOUNTERED_ERROR:
+#             print(f"{Red}FAILURE{Rst}")
 
 def get_yaml_files(base_dir):
     skip_dir = "Archived"
@@ -222,8 +266,7 @@ def validate_file(file_path):
     folder, file_name = os.path.split(file_path)
     # Note this is needed to avoid the getting the full path
     folder_name = os.path.basename(folder)
-    #  parts = file_name.splie('-')
-    parts = re.split(r'[-_]', file_name)
+    parts = file_name.split('-')
     file_prefix = parts[0]
 
     if file_prefix != "td":
@@ -237,10 +280,7 @@ def validate_file(file_path):
     try:
         with open(file_path, 'r') as stream:
             data = yaml.safe_load(stream)
-        if isinstance(data, dict) and "properties" in data:
-            role_definition_schems.validate(data)
-            print(f"{Grn}PASS{Rst}: Role definition schema valid.")
-        else:
+            check_required_keys(data)
             rbac_definition_schema.validate(data)
             print(f"{Grn}PASS{Rst}: RBAC definition schema valid.")
     except (yaml.YAMLError, SchemaError) as e:
@@ -288,14 +328,14 @@ def main():
     # Validate repository folder structure
     validate_repo_structure("infrastructure/", repo_structure_schema)
 
-    # with open(files_list_path, "r") as files_list:
-    #     files_paths = files_list.read().strip().split('\n')
-    #     if not files_paths or files_paths == ['']:
-    #         die(f"File {Red}{files_list_path}{Rst} is empty. No YAML files to validate.")
-    #     for f in files_paths:
-    #         if ("appconfig" not in f):
-    #             validate_file(f)
-    #         ENCOUNTERED_ERROR = False # Reset for next check during DEBUG run
+    with open(files_list_path, "r") as files_list:
+        files_paths = files_list.read().strip().split('\n')
+        if not files_paths or files_paths == ['']:
+            die(f"File {Red}{files_list_path}{Rst} is empty. No YAML files to validate.")
+        for f in files_paths:
+            if ("appconfig" not in f):
+                validate_file(f)
+            ENCOUNTERED_ERROR = False # Reset for next check during DEBUG run
 
     if sys.argv[1] == "-d":
         os.remove(status_file_path)

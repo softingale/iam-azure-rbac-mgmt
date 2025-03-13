@@ -4,6 +4,8 @@ properties:
   assignableScopes:
     - /
   permissions:
+    - actions:
+        - "*/read"
       notAction: []
       dataAction: []
       notDataAction: []

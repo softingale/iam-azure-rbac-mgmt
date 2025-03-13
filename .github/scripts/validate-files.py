@@ -41,6 +41,21 @@ rbac_definition_schema = Schema({
     ]
 })
 
+role_definition_schems = Schema({
+    "properties": {
+        "roleName": And(str, Regex(r'^[a-zA-Z][a-zA-Z0-9\- _]*$')),
+        "description": str,
+        "assignableScopes": [str],
+        "permissions": [
+            {
+                "actions": [str],
+                "notActions": [str],
+                "dataActions": [str],
+                "notDataActions": [str]
+            }
+        ]
+    }
+})
 repo_structure_schema = Schema({
     "dev": {
         "assignments": Or([], None),
@@ -146,6 +161,15 @@ def validate_rbac_definition(data, rbac_schema):
             print(f"{Red}FAILURE{Rst}")
 
 
+def validate_rbac_definition(data, rbac_schema):
+    global ENCOUNTERED_ERROR, status_file_dir
+    try:
+        rbac_schema.validate(data)
+        print(f"{Grn}PASS{Rst}: RBAC definition is valid.")
+    except SchemaError as e:
+        if not ENCOUNTERED_ERROR:
+            print(f"{Red}FAILURE{Rst}")
+
 def get_yaml_files(base_dir):
     skip_dir = "Archived"
     yaml_files = []
@@ -210,6 +234,21 @@ def validate_file(file_path):
 
         msg = f"===> Error: Filename prefix\n'{file_prefix}' must start with 'td-'."
         print(msg)
+    try:
+        with open(file_path, 'r') as stream:
+            data = yaml.safe_load(stream)
+        if isinstance(data, dict) and "properties" in data:
+            role_definition_schems.validate(data)
+            print(f"{Grn}PASS{Rst}: Role definition schema valid.")
+        else:
+            rbac_definition_schema.validate(data)
+            print(f"{Grn}PASS{Rst}: RBAC definition schema valid.")
+    except (yaml.YAMLError, SchemaError) as e:
+        if not ENCOUNTERED_ERROR:
+            print(f"{Red}FAILURE{Rst}")
+            ENCOUNTERED_ERROR = True
+            write_error_status(status_file_path)
+        print(e)
     
     # ASSUME role permissions file is the only option remaining
     validate(file_path, rbac_definition_schema)
